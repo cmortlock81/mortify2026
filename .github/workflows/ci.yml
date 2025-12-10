@@ -13,9 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Set up PHP
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -23,22 +25,40 @@ jobs:
           extensions: mbstring, intl, pdo, dom, xml
           coverage: none
 
+      # 3️⃣ Allow Composer plugin globally (fixes "blocked plugin" error)
+      - name: Allow Composer Plugins
+        run: composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+
+      # 4️⃣ Install dependencies (including dev)
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist || true
+        run: composer install --no-interaction --prefer-dist
 
+      # 5️⃣ Validate composer.json syntax
       - name: Validate composer.json
-        run: composer validate --strict || true
+        run: composer validate --strict
 
+      # 6️⃣ Run PHPCS (WordPress coding standards)
       - name: Run PHPCS
         run: |
           composer global require wp-coding-standards/wpcs
           ~/.composer/vendor/bin/phpcs --standard=WordPress --ignore=vendor --report=summary . || true
 
-      - name: Create ZIP package
+      # 7️⃣ Optional PHPUnit smoke test (if tests exist)
+      - name: Run PHPUnit Tests
+        run: |
+          if [ -f "vendor/bin/phpunit" ]; then
+            vendor/bin/phpunit --testdox
+          else
+            echo "No tests found, skipping."
+          fi
+
+      # 8️⃣ Create distributable ZIP
+      - name: Build ZIP package
         run: |
           mkdir dist
           zip -r dist/mortify2026.zip ./ -x "*.git*" "vendor/*" "dist/*" "tests/*"
 
+      # 9️⃣ Upload ZIP artifact
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
