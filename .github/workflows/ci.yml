@@ -1,0 +1,46 @@
+name: Mortify 2026 CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-test-package:
+    name: Build, Lint & Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo, dom, xml
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist || true
+
+      - name: Validate composer.json
+        run: composer validate --strict || true
+
+      - name: Run PHPCS
+        run: |
+          composer global require wp-coding-standards/wpcs
+          ~/.composer/vendor/bin/phpcs --standard=WordPress --ignore=vendor --report=summary . || true
+
+      - name: Create ZIP package
+        run: |
+          mkdir dist
+          zip -r dist/mortify2026.zip ./ -x "*.git*" "vendor/*" "dist/*" "tests/*"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mortify2026
+          path: dist/mortify2026.zip
