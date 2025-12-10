@@ -1,0 +1,1 @@
+<?php echo '<nav>Footer Tabs</nav>'; ?>

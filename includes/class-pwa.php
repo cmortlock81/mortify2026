@@ -1,0 +1,1 @@
+<?php if (!defined('ABSPATH')) exit; class Mortify2026_PWA {} ?>

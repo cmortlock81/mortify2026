@@ -1,0 +1,1 @@
+console.log('Mortify2026 loaded');
