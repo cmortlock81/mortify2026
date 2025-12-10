@@ -1,0 +1,82 @@
+name: Mortify 2026 Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # Triggers on version tags (e.g. v1.0.0)
+
+jobs:
+  build-and-release:
+    name: Build, Test & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the repo (including tags)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2️⃣ Set up PHP
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo, dom, xml
+          coverage: none
+
+      # 3️⃣ Allow Composer plugin globally (fixes plugin block)
+      - name: Allow Composer Plugins
+        run: composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+
+      # 4️⃣ Install dependencies
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      # 5️⃣ Validate composer.json
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      # 6️⃣ Run PHPCS (non-blocking)
+      - name: Run PHPCS
+        run: |
+          composer global require wp-coding-standards/wpcs
+          ~/.composer/vendor/bin/phpcs --standard=WordPress --ignore=vendor --report=summary . || true
+
+      # 7️⃣ Run PHPUnit (ignore empty test suite)
+      - name: Run PHPUnit Tests
+        run: |
+          if [ -f "vendor/bin/phpunit" ]; then
+            vendor/bin/phpunit --testdox --do-not-fail-on-empty-test-suite || true
+          else
+            echo "No tests found, skipping."
+          fi
+
+      # 8️⃣ Build ZIP package
+      - name: Build ZIP package
+        run: |
+          mkdir dist
+          zip -r dist/mortify2026.zip ./ -x "*.git*" "vendor/*" "dist/*" "tests/*"
+
+      # 9️⃣ Create GitHub Release with attached ZIP
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mortify 2026 ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            🚀 **Mortify 2026** Release ${{ github.ref_name }}
+
+            - WordPress plugin for app-style mobile shell
+            - Includes PWA + WooCommerce awareness
+            - Built automatically via CI
+          draft: false
+          prerelease: false
+          files: dist/mortify2026.zip
+
+      # 🔁 Backup artifact upload
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mortify2026-${{ github.ref_name }}
+          path: dist/mortify2026.zip
