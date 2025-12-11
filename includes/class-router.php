@@ -1,52 +1,116 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) exit;
+/**
+ * Mortify 2026 Router
+ *
+ * Handles routing, template loading, and asset enqueueing
+ * for the Mortify App shell under /app/.
+ *
+ * @package Mortify2026
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class Mortify2026_Router {
 
-    public function __construct() {
-        add_action('init', [$this, 'register_template']);
-        add_filter('template_include', [$this, 'include_template']);
-        add_filter('body_class', [$this, 'add_body_class']);
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
-    }
+	/**
+	 * Constructor — hook into WP lifecycle.
+	 */
+	public function __construct() {
+		add_action( 'init', [ $this, 'register_routes' ] );
+		add_filter( 'template_include', [ $this, 'load_app_template' ] );
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+	}
 
-    public static function activate() {
-        $settings = mortify_get_settings();
-        $slug = $settings['app_slug'];
-        if ( ! get_page_by_path($slug) ) {
-            wp_insert_post([
-                'post_title' => 'App',
-                'post_name' => $slug,
-                'post_type' => 'page',
-                'post_status' => 'publish',
-            ]);
-        }
-        flush_rewrite_rules();
-    }
+	/**
+	 * Register the /app/ rewrite endpoint.
+	 *
+	 * @return void
+	 */
+	public function register_routes(): void {
+		$settings = mortify_get_settings();
+		$slug     = trim( $settings['app_slug'], '/' );
 
-    public function register_template() {
-        add_filter('theme_page_templates', function($templates){
-            $templates['mortify-app.php'] = 'Mortify App Template';
-            return $templates;
-        });
-    }
+		add_rewrite_rule(
+			"^{$slug}/?$",
+			'index.php?mortify_app=1',
+			'top'
+		);
 
-    public function include_template($template) {
-        if ( mortify_in_app_scope() ) {
-            $plugin_template = MORTIFY2026_PATH . 'templates/mortify-app.php';
-            if ( file_exists($plugin_template) ) return $plugin_template;
-        }
-        return $template;
-    }
+		add_rewrite_tag( '%mortify_app%', '1' );
+	}
 
-    public function add_body_class($classes) {
-        if ( mortify_in_app_scope() ) $classes[] = 'mortify-app';
-        return $classes;
-    }
+	/**
+	 * Load the Mortify app template when /app/ is requested.
+	 *
+	 * @param string $template The default template.
+	 * @return string
+	 */
+	public function load_app_template( string $template ): string {
+		if ( get_query_var( 'mortify_app' ) ) {
+			return MORTIFY2026_PATH . 'templates/mortify-app.php';
+		}
+		return $template;
+	}
 
-    public function enqueue_assets() {
-        if ( ! mortify_in_app_scope() ) return;
-        wp_enqueue_style('mortify2026-app', MORTIFY2026_URL . 'assets/css/app.css', [], '1.0');
-        wp_enqueue_script('mortify2026-js', MORTIFY2026_URL . 'assets/js/app.js', [], '1.0', true);
-    }
+	/**
+	 * Enqueue CSS and JS assets only on /app/.
+	 *
+	 * @return void
+	 */
+	public function enqueue_assets(): void {
+		if ( ! mortify_in_app_scope() ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'mortify2026-app',
+			MORTIFY2026_URL . 'assets/css/app.css',
+			[],
+			MORTIFY2026_VERSION
+		);
+
+		wp_enqueue_script(
+			'mortify2026-app',
+			MORTIFY2026_URL . 'assets/js/app.js',
+			[ 'jquery' ],
+			MORTIFY2026_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'mortify2026-app',
+			'mortifyApp',
+			[
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'home_url' => home_url(),
+				'cart_api' => esc_url( home_url( '/wp-json/wc/store/cart' ) ),
+			]
+		);
+	}
+
+	/**
+	 * Create /app/ page on activation (if not exists).
+	 *
+	 * @return void
+	 */
+	public static function activate(): void {
+		$settings = mortify_get_settings();
+		$slug     = trim( $settings['app_slug'], '/' );
+
+		// Check if page exists
+		$page = get_page_by_path( $slug );
+		if ( ! $page ) {
+			wp_insert_post( [
+				'post_title'   => ucfirst( $slug ),
+				'post_name'    => $slug,
+				'post_status'  => 'publish',
+				'post_type'    => 'page',
+				'post_content' => 'This is the Mortify 2026 app shell.',
+			] );
+		}
+
+		flush_rewrite_rules();
+	}
 }
