@@ -1,0 +1,12 @@
+# WordPress / PHP ignores
+/vendor/
+/node_modules/
+.idea/
+.vscode/
+.DS_Store
+*.zip
+*.log
+*.tmp
+/composer.lock
+/package-lock.json
+npm-debug.log*
